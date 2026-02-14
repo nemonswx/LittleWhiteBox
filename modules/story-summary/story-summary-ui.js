@@ -495,6 +495,18 @@
             $('vector-io-status').textContent = '导入中...';
             postMsg('VECTOR_IMPORT_PICK');
         };
+
+        $('btn-export-summary').onclick = () => {
+            $('btn-export-summary').disabled = true;
+            $('summary-io-status').textContent = '导出中...';
+            postMsg('SUMMARY_EXPORT');
+        };
+
+        $('btn-import-summary').onclick = () => {
+            $('btn-import-summary').disabled = true;
+            $('summary-io-status').textContent = '导入中...';
+            postMsg('SUMMARY_IMPORT_PICK');
+        };
     }
     // ═══════════════════════════════════════════════════════════════════════════
     // Settings Modal
@@ -1645,6 +1657,35 @@ CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "
                     postMsg('REQUEST_VECTOR_STATS');
                 } else {
                     $('vector-io-status').textContent = '导入失败: ' + (d.error || '未知错误');
+                }
+                break;
+
+            case 'SUMMARY_IO_STATUS':
+                $('summary-io-status').textContent = d.status || '';
+                break;
+
+            case 'SUMMARY_EXPORT_RESULT':
+                $('btn-export-summary').disabled = false;
+                if (d.success) {
+                    $('summary-io-status').textContent = `导出成功: ${d.filename} (${(d.size / 1024).toFixed(1)}KB)`;
+                } else {
+                    $('summary-io-status').textContent = '导出失败: ' + (d.error || '未知错误');
+                }
+                break;
+
+            case 'SUMMARY_IMPORT_RESULT':
+                $('btn-import-summary').disabled = false;
+                if (d.success) {
+                    let msg = `导入成功: ${d.eventCount} 个事件`;
+                    if (typeof d.lastSummarizedMesId === 'number') {
+                        msg += `，已总结至 ${d.lastSummarizedMesId + 1} 楼`;
+                    }
+                    if (d.warnings?.length) {
+                        msg += '\n⚠️ ' + d.warnings.join('\n⚠️ ');
+                    }
+                    $('summary-io-status').textContent = msg;
+                } else {
+                    $('summary-io-status').textContent = '导入失败: ' + (d.error || '未知错误');
                 }
                 break;
 

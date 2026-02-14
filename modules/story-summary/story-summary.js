@@ -80,6 +80,7 @@ import { clearStateVectors, getStateAtomsCount, getStateVectorsCount } from "./v
 
 // vector io
 import { exportVectors, importVectors } from "./vector/vector-io.js";
+import { exportSummaryData, importSummaryData } from "./data/summary-io.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 常量
@@ -1161,6 +1162,72 @@ function handleFrameMessage(event) {
                         await sendVectorStatsToFrame();
                     } catch (e) {
                         postToFrame({ type: "VECTOR_IMPORT_RESULT", success: false, error: e.message });
+                    }
+                };
+
+                input.click();
+            })();
+            break;
+
+        case "SUMMARY_EXPORT":
+            (async () => {
+                try {
+                    const result = await exportSummaryData((status) => {
+                        postToFrame({ type: "SUMMARY_IO_STATUS", status });
+                    });
+                    postToFrame({
+                        type: "SUMMARY_EXPORT_RESULT",
+                        success: true,
+                        filename: result.filename,
+                        size: result.size,
+                        eventCount: result.eventCount,
+                    });
+                } catch (e) {
+                    postToFrame({ type: "SUMMARY_EXPORT_RESULT", success: false, error: e.message });
+                }
+            })();
+            break;
+
+        case "SUMMARY_IMPORT_PICK":
+            (async () => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = ".json,application/json";
+
+                input.onchange = async () => {
+                    const file = input.files?.[0];
+                    if (!file) {
+                        postToFrame({ type: "SUMMARY_IMPORT_RESULT", success: false, error: "未选择文件" });
+                        return;
+                    }
+
+                    try {
+                        const result = await importSummaryData(file, (status) => {
+                            postToFrame({ type: "SUMMARY_IO_STATUS", status });
+                        });
+
+                        const { chat } = getContext();
+                        const store = getSummaryStore();
+                        const totalFloors = Array.isArray(chat) ? chat.length : 0;
+
+                        if (store?.hideSummarizedHistory) {
+                            await applyHideState();
+                        } else {
+                            await clearHideState();
+                        }
+
+                        await sendFrameBaseData(store, totalFloors);
+                        sendFrameFullData(store, totalFloors);
+
+                        postToFrame({
+                            type: "SUMMARY_IMPORT_RESULT",
+                            success: true,
+                            eventCount: result.eventCount,
+                            warnings: result.warnings,
+                            lastSummarizedMesId: result.lastSummarizedMesId,
+                        });
+                    } catch (e) {
+                        postToFrame({ type: "SUMMARY_IMPORT_RESULT", success: false, error: e.message });
                     }
                 };
 
