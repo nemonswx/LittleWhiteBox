@@ -79,6 +79,36 @@ function normalizeSummaryStore(rawStore) {
     return normalized;
 }
 
+function markAsCarryoverAddedAt(json) {
+    if (!json || typeof json !== "object") return;
+
+    (json.keywords || []).forEach((k) => {
+        if (k && typeof k === "object") k._addedAt = -1;
+    });
+    (json.events || []).forEach((e) => {
+        if (e && typeof e === "object") e._addedAt = -1;
+    });
+    (json.world || []).forEach((w) => {
+        if (w && typeof w === "object") w._addedAt = -1;
+    });
+
+    (json.arcs || []).forEach((a) => {
+        if (!a || typeof a !== "object") return;
+        a._addedAt = -1;
+        (a.moments || []).forEach((m) => {
+            if (m && typeof m === "object") m._addedAt = -1;
+        });
+    });
+
+    const chars = json.characters || {};
+    (chars.main || []).forEach((m) => {
+        if (m && typeof m === "object") m._addedAt = -1;
+    });
+    (chars.relationships || []).forEach((r) => {
+        if (r && typeof r === "object") r._addedAt = -1;
+    });
+}
+
 function getStoreFromImportPayload(parsed) {
     if (!parsed || typeof parsed !== "object") return null;
 
@@ -139,7 +169,7 @@ export async function exportSummaryData(onProgress) {
 }
 
 export async function importSummaryData(file, onProgress) {
-    const { chatId } = getContext();
+    const { chatId, chat } = getContext();
     if (!chatId) {
         throw new Error("未打开聊天");
     }
@@ -167,6 +197,19 @@ export async function importSummaryData(file, onProgress) {
 
     onProgress?.("校验并写入...");
     const normalized = normalizeSummaryStore(rawStore);
+    const currentLength = Array.isArray(chat) ? chat.length : 0;
+
+    // cut 历史后导入旧总结：保留总结内容，但将当前聊天视为“未总结”
+    if (currentLength >= 0 && normalized.lastSummarizedMesId >= currentLength) {
+        warnings.push(
+            `已检测到楼层越界（导入: ${normalized.lastSummarizedMesId + 1} 楼, 当前聊天: ${currentLength} 楼），` +
+            "已自动重置为可继续增量总结模式"
+        );
+        normalized.lastSummarizedMesId = -1;
+        normalized.summaryHistory = [];
+        normalized.hideSummarizedHistory = false;
+        markAsCarryoverAddedAt(normalized.json);
+    }
 
     const store = getSummaryStore();
     if (!store) {
